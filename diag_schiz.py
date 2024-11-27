@@ -1,46 +1,43 @@
+import pickle
+import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
-from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
-from sklearn.metrics import accuracy_score, precision_score, recall_score, roc_auc_score
+from sklearn.metrics import roc_auc_score, log_loss
+from logistic_regression import LogisticRegression  # Import the custom Logistic Regression class
 
-# Load the data
+# Data Preparation
 train_fnc = pd.read_csv('./data/Train/train_FNC.csv')
 train_sbm = pd.read_csv('./data/Train/train_SBM.csv')
 train_labels = pd.read_csv('./data/Train/train_labels.csv')
 
 # Merge features and labels
-train_data = pd.merge(train_fnc, train_sbm, on='Id')  # Merge FNC and SBM data on the 'Id' column
-train_data = pd.merge(train_data, train_labels, on='Id')  # Add labels
+train_data = pd.merge(train_fnc, train_sbm, on='Id')
+train_data = pd.merge(train_data, train_labels, on='Id')
 
-# Separate features (X) and labels (y)
-X = train_data.drop(columns=['Id', 'Class'])  # Drop 'Id' and 'Class' (target) from features
-y = train_data['Class']  # 'Class' is the target column
+# Prepare features and labels
+X = train_data.drop(columns=['Id', 'Class']).values
+y = train_data['Class'].values
 
-# Handle missing values
-X.fillna(X.mean(), inplace=True)
-
-# Standardize the features
+# Standardize features
 scaler = StandardScaler()
 X_scaled = scaler.fit_transform(X)
 
-# Split data into training and testing sets
-X_train, X_test, y_train, y_test = train_test_split(X_scaled, y, test_size=0.2, random_state=42)
+# Split Data
+def split_data(X, y, split_ratio=0.8):
+    split_idx = int(len(X) * split_ratio)
+    return X[:split_idx], X[split_idx:], y[:split_idx], y[split_idx:]
 
-# Train Logistic Regression
-lr_model = LogisticRegression(random_state=42, max_iter=500)
-lr_model.fit(X_train, y_train)
+X_train, X_test, y_train, y_test = split_data(X_scaled, y)
 
-# Evaluate the model
-y_pred = lr_model.predict(X_test)
-y_proba = lr_model.predict_proba(X_test)[:, 1]  # Probabilities for ROC-AUC
+# Train Custom Logistic Regression
+model = LogisticRegression(learning_rate=0.01, max_iters=1000, l1_reg=0.01, l2_reg=0.01, batch_size=32)
+model.fit(X_train, y_train)
 
-accuracy = accuracy_score(y_test, y_pred)
-precision = precision_score(y_test, y_pred)
-recall = recall_score(y_test, y_pred)
-roc_auc = roc_auc_score(y_test, y_proba)
+# Save the trained model and scaler
+with open('./project/model.pkl', 'wb') as f:
+    pickle.dump(model, f)
 
-print(f"Accuracy: {accuracy:.2f}")
-print(f"Precision: {precision:.2f}")
-print(f"Recall: {recall:.2f}")
-print(f"ROC-AUC: {roc_auc:.2f}")
+with open('./project/scaler.pkl', 'wb') as f:
+    pickle.dump(scaler, f)
+
+print("Custom model and scaler saved successfully!")
